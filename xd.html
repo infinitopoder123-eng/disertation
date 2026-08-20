@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Paper Plane: The 4 Forces of Flight</title>
+<style>
+  :root{
+    --sky-top:#8ec9f2; --sky-bot:#dff0fb; --ink:#14263a; --panel:rgba(255,255,255,.82);
+    --lift:#1f9d55; --weight:#b3261e; --thrust:#1a56db; --drag:#c2410c;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;font-family:ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;color:var(--ink)}
+  body{overflow:hidden;background:linear-gradient(180deg,var(--sky-top),var(--sky-bot));
+       -webkit-tap-highlight-color:transparent;touch-action:none}
+  canvas#c{display:block;width:100vw;height:100vh}
+
+  .panel{position:fixed;top:14px;left:14px;width:330px;max-width:46vw;background:var(--panel);
+    backdrop-filter:blur(8px);border:1px solid rgba(20,38,58,.12);border-radius:18px;
+    padding:14px 16px 16px;box-shadow:0 10px 30px rgba(20,38,58,.15)}
+  h1{font-size:15px;margin:0 0 6px;letter-spacing:.2px}
+  .sub{font-size:11px;opacity:.65;margin-bottom:10px}
+
+  .knobs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+  .knob-wrap{display:flex;flex-direction:column;align-items:center;gap:3px}
+  .knob-label{font-size:10.5px;font-weight:600;opacity:.8;text-align:center;line-height:1.15}
+  .knob-val{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+  .knob-row{display:flex;align-items:center;gap:6px}
+  .stepper{width:30px;height:30px;border:0;border-radius:50%;background:#14263a;color:#fff;
+    font-size:18px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;
+    flex:none;box-shadow:0 2px 6px rgba(20,38,58,.25);user-select:none}
+  .stepper:active{transform:scale(.92)}
+  .stepper:disabled{opacity:.35}
+  canvas.knob{width:108px;height:108px;cursor:grab;touch-action:none}
+  canvas.knob:active{cursor:grabbing}
+
+  .timer{margin-top:12px;font-size:12px;font-variant-numeric:tabular-nums;display:flex;justify-content:space-between}
+  .timer b{font-weight:600}
+  button.reset{margin-top:10px;width:100%;padding:9px;border:0;border-radius:10px;
+    background:#14263a;color:#fff;font-size:12px;cursor:pointer}
+  .hint{margin-top:9px;font-size:10.5px;line-height:1.4;opacity:.7}
+
+  .legend{position:fixed;top:14px;right:14px;background:var(--panel);backdrop-filter:blur(8px);
+    border:1px solid rgba(20,38,58,.12);border-radius:14px;padding:12px 14px;font-size:12px;min-width:190px;
+    box-shadow:0 10px 30px rgba(20,38,58,.15)}
+  .legend div{display:flex;align-items:center;gap:8px;margin:5px 0;font-variant-numeric:tabular-nums}
+  .sw{width:14px;height:4px;border-radius:2px;flex:none}
+
+  /* Botón de regreso añadido */
+  .back-btn{position:fixed;bottom:14px;left:14px;background:#1a56db;color:#fff;text-decoration:none;padding:10px 18px;border-radius:10px;font-weight:bold;font-size:13px;box-shadow:0 4px 12px rgba(26,86,219,0.4);z-index:999;transition:background 0.2s}
+  .back-btn:hover{background:#1e40af}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<a href="presentacion.html" class="back-btn">← Volver a Presentación</a>
+
+<div class="panel">
+  <h1>Paper Plane — The 4 Forces of Flight</h1>
+  <div class="sub">Drag the round knobs (or tap +/-) to control the plane</div>
+
+  <div class="knobs">
+    <div class="knob-wrap">
+      <div class="knob-label">Pitch<br>(angle of attack)</div>
+      <div class="knob-row">
+        <button class="stepper" id="pitchDn" aria-label="Pitch down">−</button>
+        <canvas class="knob" id="kPitch" width="216" height="216"></canvas>
+        <button class="stepper" id="pitchUp" aria-label="Pitch up">+</button>
+      </div>
+      <div class="knob-val" id="vPitch">6.0°</div>
+    </div>
+
+    <div class="knob-wrap">
+      <div class="knob-label">Speed<br>(airflow)</div>
+      <div class="knob-row">
+        <button class="stepper" id="speedDn" aria-label="Slower">−</button>
+        <canvas class="knob" id="kSpeed" width="216" height="216"></canvas>
+        <button class="stepper" id="speedUp" aria-label="Faster">+</button>
+      </div>
+      <div class="knob-val" id="vSpeed">18.0 m/s</div>
+    </div>
+
+    <div class="knob-wrap">
+      <div class="knob-label">Gravity</div>
+      <div class="knob-row">
+        <button class="stepper" id="gravDn" aria-label="Less gravity">−</button>
+        <canvas class="knob" id="kGrav" width="216" height="216"></canvas>
+        <button class="stepper" id="gravUp" aria-label="More gravity">+</button>
+      </div>
+      <div class="knob-val" id="vGrav">9.8 m/s²</div>
+    </div>
+  </div>
+
+  <div class="timer"><span id="phase">Free flight</span><b id="clock">T+0.0 s</b></div>
+  <button class="reset" id="reset">Restart flight</button>
+  <div class="hint">More pitch → more lift (until stall at ~14°). Higher gravity → the plane sinks. Streamlines curve around the wing inside a 25% radius. After 30 s the autopilot takes over and lands on the runway.</div>
+</div>
+
+<div class="legend">
+  <div><span class="sw" style="background:var(--lift)"></span> Lift <b id="fL"></b></div>
+  <div><span class="sw" style="background:var(--weight)"></span> Weight <b id="fW"></b></div>
+  <div><span class="sw" style="background:var(--thrust)"></span> Thrust <b id="fT"></b></div>
+  <div><span class="sw" style="background:var(--drag)"></span> Drag <b id="fD"></b></div>
+  <div style="margin-top:8px;opacity:.75">Vertical speed <b id="fVy"></b></div>
+  <div style="opacity:.75" id="stall"></div>
+</div>
+
+<script>
+const $ = id=>document.getElementById(id);
+
+// ============ Rotary knob control (touch + mouse) ============
+class Knob{
+  constructor(canvas, {min,max,step,value,color,label,fmt}){
+    this.cv=canvas; this.ctx=canvas.getContext('2d');
+    this.min=min; this.max=max; this.step=step; this.value=value;
+    this.color=color; this.label=label; this.fmt=fmt;
+    this.disabled=false;
+    this.DPR=Math.min(2,window.devicePixelRatio||1);
+    this.draw();
+    this._bind();
+  }
+  set(v){ this.value=this._snap(v); this.draw(); }
+  _snap(v){ v=Math.max(this.min,Math.min(this.max,v));
+    return Math.round(v/this.step)*this.step; }
+  _angle(){ // 0 at top, clockwise, range -135..135 (270° sweep, gap at bottom)
+    const t=(this.value-this.min)/(this.max-this.min);
+    return -135 + t*270;
+  }
+  draw(){
+    const c=this.ctx, S=216, cx=S/2, cy=S/2, R=92, lw=16;
+    c.setTransform(this.DPR,0,0,this.DPR,0,0);
+    c.clearRect(0,0,S,S);
+    // track
+    c.lineCap='round'; c.lineWidth=lw;
+    c.strokeStyle='rgba(20,38,58,.12)';
+    c.beginPath(); c.arc(cx,cy,R,135*Math.PI/180,405*Math.PI/180); c.stroke();
+    // value arc
+    const ang=this._angle()*Math.PI/180;
+    const startA=(225)*Math.PI/180; // bottom-left start (135deg in screen)
+    // draw from start (135°) clockwise by value fraction
+    const t=(this.value-this.min)/(this.max-this.min);
+    c.strokeStyle=this.disabled?'rgba(20,38,58,.25)':this.color;
+    c.beginPath();
+    c.arc(cx,cy,R,135*Math.PI/180,(135+270*t)*Math.PI/180);
+    c.stroke();
+    // pointer
+    const px=cx+Math.cos((ang-90)*Math.PI/180)*R;
+    const py=cy+Math.sin((ang-90)*Math.PI/180)*R;
+    c.strokeStyle=this.disabled?'rgba(20,38,58,.35)':'#14263a';
+    c.lineWidth=4;
+    c.beginPath(); c.moveTo(cx,cy); c.lineTo(px,py); c.stroke();
+    // hub
+    c.fillStyle='#fff'; c.strokeStyle='rgba(20,38,58,.2)'; c.lineWidth=2;
+    c.beginPath(); c.arc(cx,cy,12,0,7); c.fill(); c.stroke();
+    c.fillStyle=this.disabled?'rgba(20,38,58,.3)':'#14263a';
+    c.beginPath(); c.arc(cx,cy,5,0,7); c.fill();
+  }
+  _bind(){
+    const drag=(e)=>{
+      if(this.disabled) return;
+      const r=this.cv.getBoundingClientRect();
+      const x=(e.clientX-r.left)/r.width*216, y=(e.clientY-r.top)/r.height*216;
+      let a=Math.atan2(y-108,x-108)*180/Math.PI; // 0=right, CW+
+      let k=a+90; // 0=top, CW+
+      if(k>180) k-=360;
+      // gap at bottom: clamp to [-135,135]
+      if(k>135) k=135; if(k<-135) k=-135;
+      const t=(k+135)/270;
+      const v=this.min+t*(this.max-this.min);
+      this.set(v);
+      if(this.onchange) this.onchange(this.value);
+    };
+    let down=false;
+    this.cv.addEventListener('pointerdown',e=>{down=true;this.cv.setPointerCapture(e.pointerId);drag(e);e.preventDefault();});
+    this.cv.addEventListener('pointermove',e=>{if(down)drag(e);});
+    this.cv.addEventListener('pointerup',e=>{down=false;});
+    this.cv.addEventListener('pointercancel',()=>down=false);
+    // wheel fine-tune
+    this.cv.addEventListener('wheel',e=>{
+      if(this.disabled) return;
+      e.preventDefault();
+      this.set(this.value+(e.deltaY<0?this.step:-this.step));
+      if(this.onchange) this.onchange(this.value);
+    },{passive:false});
+  }
+}
+
+// create knobs
+const kPitch=new Knob($('kPitch'),{min:-18,max:18,step:0.5,value:6,color:'#1a56db'});
+const kSpeed =new Knob($('kSpeed'), {min:0, max:40,step:0.5,value:18,color:'#1f9d55'});
+const kGrav  =new Knob($('kGrav'),  {min:0, max:25,step:0.1,value:9.8,color:'#b3261e'});
+
+const inPitch=kPitch, inSpeed=kSpeed, inGrav=kGrav; // compat names for physics code
+
+// steppers
+function bindStep(btn, knob, dir){
+  const fire=()=>{ if(knob.disabled) return; knob.set(knob.value+dir*knob.step);
+    [knob.onchange].forEach(f=>f&&f(knob.value)); };
+  // repeat on hold
+  let t=null;
+  const press=()=>{ fire(); t=setInterval(fire,90); };
+  const release=()=>{ if(t){clearInterval(t);t=null;} };
+  btn.addEventListener('pointerdown',e=>{e.preventDefault();press();});
+  btn.addEventListener('pointerup',release); btn.addEventListener('pointerleave',release);
+  btn.addEventListener('pointercancel',release);
+}
+bindStep($('pitchUp'),kPitch,+1); bindStep($('pitchDn'),kPitch,-1);
+bindStep($('speedUp'), kSpeed,+1); bindStep($('speedDn'), kSpeed,-1);
+bindStep($('gravUp'),  kGrav,+1);  bindStep($('gravDn'),  kGrav,-1);
+
+const cv=$('c'), ctx=cv.getContext('2d');
+let W=0,H=0,DPR=1;
+function resize(){
+  DPR=Math.min(2,window.devicePixelRatio||1);
+  W=cv.clientWidth; H=cv.clientHeight;
+  cv.width=W*DPR; cv.height=H*DPR;
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+addEventListener('resize',()=>{resize();buildClouds();seedFlow();});
+
+// ---------- physics ----------
+const RHO=1.225, S=0.030, MASS=0.40, CD0=0.04, K=0.07, STALL=14;
+const LAND_AT=30, LAND_DUR=9;
+let alt=0, vy=0, timeS=0, landing=false, landStart=0, landFrom=0, landed=false;
+let landSpeed0=18, landPitch0=6;
+
+function coeffs(pitchDeg,v){
+  const a=pitchDeg*Math.PI/180;
+  let cl=2*Math.PI*a;
+  const stallRad=STALL*Math.PI/180;
+  if(Math.abs(a)>stallRad){ const over=Math.min(1,(Math.abs(a)-stallRad)/0.20); cl*=(1-0.75*over); }
+  const q=0.5*RHO*v*v, cd=CD0+K*cl*cl;
+  return {cl,cd,L:q*S*cl,D:q*S*cd,stalled:Math.abs(a)>stallRad};
+}
+function groundAlt(){ return (H*0.5-(H-52))/22; }
+function limit(){ return (H*0.5-110)/22; }
+const lerp=(a,b,t)=>a+(b-a)*t;
+const ease=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+
+function step(dt){
+  if(!landing && timeS>=LAND_AT){
+    landing=true; landStart=timeS; landFrom=alt;
+    landSpeed0=kSpeed.value; landPitch0=kPitch.value;
+  }
+  if(landing){
+    const t=Math.min(1,(timeS-landStart)/LAND_DUR), e=ease(t);
+    const prev=alt; alt=lerp(landFrom,groundAlt(),e); vy=(alt-prev)/Math.max(dt,1e-4);
+    const p=t<0.8?lerp(landPitch0,-5,t/0.8):lerp(-5,5,(t-0.8)/0.2);
+    kPitch.set(p);
+    kSpeed.set(t<0.85?lerp(landSpeed0,7,t/0.85):lerp(7,0,(t-0.85)/0.15));
+    if(t>=1){ landed=true; vy=0; kPitch.set(0); kSpeed.set(0); }
+  }
+  const p=kPitch.value, v=kSpeed.value, g=kGrav.value;
+  const {L,D,stalled}=coeffs(p,v);
+  const Wt=MASS*g, a=p*Math.PI/180, T=D;
+  if(!landing){
+    const Fy=L*Math.cos(a)+T*Math.sin(a)-Wt;
+    vy+=(Fy/MASS)*dt; vy*=0.955; alt+=vy*dt;
+    const lim=limit();
+    if(alt>lim){alt=lim; vy=Math.min(vy,0);}
+    if(alt<groundAlt()){alt=groundAlt(); vy=Math.max(vy,0);}
+  }
+  return {L,D,T,Wt,stalled,p,v,g};
+}
+
+// ---------- clouds ----------
+let clouds=[];
+function buildClouds(){
+  clouds=[]; const n=Math.round(W/170)+4;
+  for(let i=0;i<n;i++) clouds.push({x:Math.random()*W,y:50+Math.random()*(H-190),s:.5+Math.random()*1.2,sp:.25+Math.random()*.7,o:.35+Math.random()*.4});
+}
+function drawCloud(x,y,s,o){
+  ctx.save(); ctx.translate(x,y); ctx.scale(s,s); ctx.globalAlpha=o; ctx.fillStyle='#fff';
+  const blobs=[[0,0,34],[34,8,26],[-34,10,24],[14,-16,24],[-16,-12,20],[56,14,16],[-56,16,15]];
+  ctx.beginPath(); for(const[bx,by,r]of blobs){ctx.moveTo(bx+r,by);ctx.arc(bx,by,r,0,7);} ctx.fill();
+  ctx.globalAlpha=o*.35; ctx.fillStyle='#cfe4f4';
+  ctx.beginPath(); ctx.ellipse(0,16,74,13,0,0,7); ctx.fill(); ctx.restore();
+}
+
+// ---------- runway ----------
+let dashOff=0;
+function drawGround(v,dt){
+  const gy=H-70; ctx.save();
+  const gg=ctx.createLinearGradient(0,gy-30,0,H); gg.addColorStop(0,'#a8cf8f'); gg.addColorStop(1,'#7fb26a');
+  ctx.fillStyle=gg; ctx.fillRect(0,gy-8,W,H-gy+8);
+  ctx.fillStyle='#4b5563'; ctx.fillRect(0,gy+8,W,34);
+  ctx.fillStyle='#3f4854'; ctx.fillRect(0,gy+8,W,3);
+  dashOff=(dashOff+v*dt*6)%90;
+  ctx.fillStyle='#f5f7fa';
+  for(let x=-90-dashOff;x<W+90;x+=90) ctx.fillRect(x,gy+23,48,4);
+  ctx.globalAlpha=.85; for(let i=0;i<5;i++) ctx.fillRect(24,gy+11+i*6,26,3); ctx.restore();
+}
+
+// ---------- airflow ----------
+let R=200,px=0,py=0,parts=[];
+function seedFlow(){ R=0.25*Math.min(W,H); parts=[]; for(let i=0;i<420;i++) parts.push(spawn(true)); }
+function spawn(anywhere){
+  const t=Math.random()*Math.PI*2, r=anywhere?Math.sqrt(Math.random())*R:R;
+  return {x:Math.cos(t)*r,y:Math.sin(t)*r,life:0,max:1.2+Math.random()*1.6,tr:[]};
+}
+function field(x,y,U,gamma,a){
+  const A=26, ca=Math.cos(a), sa=Math.sin(a);
+  const xr=x*ca+y*sa, yr=-x*sa+y*ca;
+  const r2=Math.max(xr*xr+yr*yr,A*A*0.85);
+  let u=U*(1-A*A*(xr*xr-yr*yr)/(r2*r2));
+  let v=U*(-A*A*2*xr*yr/(r2*r2));
+  u+=gamma*yr/(2*Math.PI*r2); v+=-gamma*xr/(2*Math.PI*r2);
+  return [u*ca-v*sa, u*sa+v*ca];
+}
+
+// ---------- plane ----------
+function drawPlane(a){
+  ctx.save(); ctx.translate(px,py); ctx.rotate(-a);
+  ctx.shadowColor='rgba(20,38,58,.25)'; ctx.shadowBlur=14; ctx.shadowOffsetY=6;
+  ctx.fillStyle='#f7fafc'; ctx.strokeStyle='#93a5b8'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(52,0); ctx.lineTo(-40,-20); ctx.lineTo(-24,0); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.shadowColor='transparent'; ctx.fillStyle='#e3eaf2';
+  ctx.beginPath(); ctx.moveTo(52,0); ctx.lineTo(-40,20); ctx.lineTo(-24,0); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle='#cdd8e5';
+  ctx.beginPath(); ctx.moveTo(52,0); ctx.lineTo(-24,0); ctx.lineTo(-40,4); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+function arrow(x,y,dx,dy,color,label){
+  const len=Math.hypot(dx,dy); if(len<6) return;
+  const ux=dx/len,uy=dy/len,hx=x+dx,hy=y+dy,h=Math.min(13,len*.35);
+  ctx.save(); ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=4; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(hx-ux*h,hy-uy*h); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(hx,hy); ctx.lineTo(hx-ux*h-uy*h*.55,hy-uy*h+ux*h*.55);
+  ctx.lineTo(hx-ux*h+uy*h*.55,hy-uy*h-ux*h*.55); ctx.closePath(); ctx.fill();
+  ctx.font='600 12px ui-sans-serif,system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillStyle='rgba(255,255,255,.85)'; const tw=ctx.measureText(label).width+8;
+  ctx.fillRect(hx+ux*14-tw/2,hy+uy*14-9,tw,17); ctx.fillStyle=color;
+  ctx.fillText(label,hx+ux*14,hy+uy*14); ctx.restore();
+}
+
+const fmt=n=>n.toFixed(3)+' N';
+let last=performance.now();
+function frame(now){
+  const dt=Math.min(0.033,(now-last)/1000); last=now; timeS+=dt;
+  const s=step(dt);
+  px=W*0.42; py=H*0.5-alt*22;
+  const a=s.p*Math.PI/180;
+
+  const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#8ec9f2'); g.addColorStop(1,'#e6f3fc');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+  for(const cl of clouds){
+    cl.x-=(s.v*cl.sp*0.9)*dt*6; cl.y+=vy*22*dt*cl.sp*0.6;
+    if(cl.x<-140){cl.x=W+140; cl.y=50+Math.random()*(H-190);}
+    if(cl.y<-60) cl.y=H-160; if(cl.y>H-120) cl.y=-60;
+    drawCloud(cl.x,cl.y,cl.s,cl.o);
+  }
+  drawGround(s.v,dt);
+
+  ctx.save(); ctx.beginPath(); ctx.arc(px,py,R,0,7);
+  ctx.strokeStyle='rgba(20,38,58,.18)'; ctx.setLineDash([6,7]); ctx.lineWidth=1.5; ctx.stroke();
+  ctx.setLineDash([]); ctx.clip();
+  const U=-Math.max(2,s.v)*7, gamma=-s.L*3200;
+  ctx.lineWidth=1.4; ctx.lineCap='round';
+  for(const p of parts){
+    const [u,v]=field(p.x,p.y,U,gamma,a);
+    p.x+=u*dt; p.y+=v*dt; p.life+=dt;
+    p.tr.push([p.x,p.y]); if(p.tr.length>16) p.tr.shift();
+    const sp=Math.hypot(u,v)/Math.abs(U||1);
+    ctx.strokeStyle=`hsla(${210-Math.max(-25,Math.min(75,(sp-1)*95))},80%,${50-Math.min(12,Math.abs(sp-1)*22)}%,.5)`;
+    ctx.beginPath();
+    for(let i=0;i<p.tr.length;i++){const[tx,ty]=p.tr[i]; i?ctx.lineTo(px+tx,py+ty):ctx.moveTo(px+tx,py+ty);} ctx.stroke();
+    if(p.life>p.max||Math.hypot(p.x,p.y)>R*1.02){
+      const t=(Math.random()*2-1)*Math.PI*0.55;
+      p.x=Math.cos(t)*R*0.99; p.y=Math.sin(t)*R*0.99; p.life=0; p.max=1.0+Math.random()*1.6; p.tr=[];
+    }
+  }
+  ctx.restore();
+
+  drawPlane(a);
+
+  const k=30;
+  const lift=Math.min(200,s.L*k), weight=Math.min(200,s.Wt*k),
+        thrust=Math.min(170,s.T*k*3+26), drag=Math.min(170,s.D*k*3+22);
+  const ca=Math.cos(a), sa=Math.sin(a);
+  arrow(px,py,sa*lift,-ca*lift,'#1f9d55','Lift');
+  arrow(px,py,0,weight,'#b3261e','Weight');
+  arrow(px,py,ca*thrust,-sa*thrust,'#1a56db','Thrust');
+  arrow(px,py,-ca*drag,sa*drag,'#c2410c','Drag');
+
+  $('vPitch').textContent=kPitch.value.toFixed(1)+'°';
+  $('vSpeed').textContent=kSpeed.value.toFixed(1)+' m/s';
+  $('vGrav').textContent=kGrav.value.toFixed(1)+' m/s²';
+  $('fL').textContent=fmt(s.L); $('fW').textContent=fmt(s.Wt);
+  $('fT').textContent=fmt(s.T); $('fD').textContent=fmt(s.D);
+  $('fVy').textContent=(vy>=0?'+':'')+vy.toFixed(2)+' m/s '+(vy>0.05?'↑ climbing':vy<-0.05?'↓ descending':'· level');
+  $('stall').textContent=s.stalled?'⚠ Stall':'';
+  $('clock').textContent='T+'+timeS.toFixed(1)+' s';
+  $('phase').textContent=landed?'Landed on runway':landing?'Autoland: approach':'Free flight ('+Math.max(0,LAND_AT-timeS).toFixed(0)+' s to autoland)';
+  kPitch.disabled=kSpeed.disabled=landing;
+  // refresh knob visuals when disabled state or autopilot changes them
+  kPitch.draw(); kSpeed.draw();
+
+  requestAnimationFrame(frame);
+}
+
+$('reset').onclick=()=>{
+  alt=0; vy=0; timeS=0; landing=false; landed=false;
+  kPitch.set(6); kSpeed.set(18); kPitch.disabled=kSpeed.disabled=false;
+  kPitch.draw(); kSpeed.draw();
+  seedFlow();
+};
+resize(); buildClouds(); seedFlow(); requestAnimationFrame(frame);
+</script>
+</body>
+</html>
